@@ -2,16 +2,17 @@ const mongoose = require("mongoose");
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.DB_STRING, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      useFindAndModify: false,
-      useCreateIndex: true,
-    });
+    const uri = process.env.DB_STRING;
+
+    if (!uri) {
+      throw new Error("DB_STRING is missing in .env");
+    }
+
+    const conn = await mongoose.connect(uri);
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (err) {
-    console.error(err);
+    console.error("Database connection error:", err.message);
     process.exit(1);
   }
 };

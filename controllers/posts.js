@@ -1,5 +1,6 @@
 const cloudinary = require("../middleware/cloudinary");
 const Post = require("../models/Post");
+const Comment = require("../models/Comment");
 
 module.exports = {
   getProfile: async (req, res) => {
@@ -20,8 +21,10 @@ module.exports = {
   },
   getPost: async (req, res) => {
     try {
-      const post = await Post.findById(req.params.id);
-      res.render("post.ejs", { post: post, user: req.user });
+      const post = await Post.findById(req.params.id).lean();
+      // replace this: res.render("post.ejs", { post: post, user: req.user });
+      const comments = await Comment.find({post: req.params.id}).sort({ createdAt: "desc" }).lean();
+      res.render("post.ejs", { post: post, user: req.user, comments: comments });
     } catch (err) {
       console.log(err);
     }
@@ -59,18 +62,43 @@ module.exports = {
       console.log(err);
     }
   },
+
+  //Post.remove() is deprecated, update syntax for mongoose v6+
   deletePost: async (req, res) => {
-    try {
-      // Find post by id
-      let post = await Post.findById({ _id: req.params.id });
-      // Delete image from cloudinary
-      await cloudinary.uploader.destroy(post.cloudinaryId);
-      // Delete post from db
-      await Post.remove({ _id: req.params.id });
-      console.log("Deleted Post");
-      res.redirect("/profile");
-    } catch (err) {
-      res.redirect("/profile");
+  try {
+    // Find post by id
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      console.log("Post not found");
+      return res.redirect("/profile");
     }
-  },
+
+    // Delete image from Cloudinary
+    await cloudinary.uploader.destroy(post.cloudinaryId);
+
+    // Delete post from DB using Mongoose v8 syntax
+    await Post.findByIdAndDelete(req.params.id);
+
+    console.log("Deleted Post");
+    res.redirect("/profile");
+  } catch (err) {
+    console.error(err);
+    res.redirect("/profile");
+  }
+},
+  //old version:
+  // deletePost: async (req, res) => {
+  //   try {
+  //     // Find post by id
+  //     let post = await Post.findById({ _id: req.params.id });
+  //     // Delete image from cloudinary
+  //     await cloudinary.uploader.destroy(post.cloudinaryId);
+  //     // Delete post from db
+  //     await Post.remove({ _id: req.params.id });
+  //     console.log("Deleted Post");
+  //     res.redirect("/profile");
+  //   } catch (err) {
+  //     res.redirect("/profile");
+  //   }
+  // },
 };

@@ -65,7 +65,7 @@ exports.getSignup = (req, res) => {
   });
 };
 
-exports.postSignup = (req, res, next) => {
+exports.postSignup = async (req, res, next) => {
   const validationErrors = [];
   if (!validator.isEmail(req.body.email))
     validationErrors.push({ msg: "Please enter a valid email address." });
@@ -89,30 +89,55 @@ exports.postSignup = (req, res, next) => {
     email: req.body.email,
     password: req.body.password,
   });
+// latest mongoose 8 syntax fix for findOne - callback-style Mongoose query, which no longer works in Mongoose 6/7/8, need to convert
+// findone and save with async/await or Promises
+// replaced with the following code block:
+  try {
+    // Check if a user with the same email or username exists
+    const existingUser = await User.findOne({
+      $or: [{ email: req.body.email }, { userName: req.body.userName }],
+    });
 
-  User.findOne(
-    { $or: [{ email: req.body.email }, { userName: req.body.userName }] },
-    (err, existingUser) => {
-      if (err) {
-        return next(err);
-      }
-      if (existingUser) {
-        req.flash("errors", {
-          msg: "Account with that email address or username already exists.",
-        });
-        return res.redirect("../signup");
-      }
-      user.save((err) => {
-        if (err) {
-          return next(err);
-        }
-        req.logIn(user, (err) => {
-          if (err) {
-            return next(err);
-          }
-          res.redirect("/profile");
-        });
+    if (existingUser) {
+      req.flash("errors", {
+        msg: "Account with that email address or username already exists.",
       });
+      return res.redirect("../signup");
     }
-  );
+
+    // Save the new user
+    await user.save();
+
+    // Log the user in
+    req.logIn(user, (err) => {
+      if (err) return next(err);
+      return res.redirect("/profile");
+    });
+  } catch (err) {
+    return next(err);
+  }
 };
+// old version:
+  // User.findOne(
+  //   { $or: [{ email: req.body.email }, { userName: req.body.userName }] },
+  //   (err, existingUser) => {
+  //     if (err) {
+  //       return next(err);
+  //     }
+  //     if (existingUser) {
+  //       req.flash("errors", {
+  //         msg: "Account with that email address or username already exists.",
+  //       });
+  //       return res.redirect("../signup");
+  //     }
+  //     user.save((err) => {
+  //       if (err) {
+  //         return next(err);
+  //       }
+  //       req.logIn(user, (err) => {
+  //         if (err) {
+  //           return next(err);
+  //         }
+  //         res.redirect("/profile");
+  //       });
+  //     });
